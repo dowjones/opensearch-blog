@@ -13,27 +13,39 @@ At Dow Jones, we started a similar journey as we continue to move our applicatio
 With OpenTelmetry as the core of our pipeline we still needed to decide on the sink for our traces, tools to vizualize, query on the traces, and tools that help in exporting these traces to create a Federated architecture. After much deliberation, we decided on the following componets:
 
 - **Opentelemetry** for creation, propagation, collection, processing and exporting trace data.
-- **AWS opensearch** (formerly elasticsearch) as the sink for the traces
-- **Data prepper** and **Jaeger** to re-format opentelemetry trace data and export it to opensearch in formats that both kibana and jaeger understand. (This should go away soon as both jaeger and AWS kibana will natively be able to use otlp traces)
-- **Trace Analytics Plugin** for opensearch and Jaeger to vizualize and query traces
 
 OpenTelemetry (OTEL) was formed by the merging of OpenTracing and OpenCensus. Currently a CNCF incubating project and its second most active in terms of contributions; Kubernetes being the first. OTEL since its inception aimed to offer a single set of APIs and libraries that standardise how you collect and transfer telemetry data.
 
-Jaeger with its community engagement and helping track and measure requests and transactions by analyzing end-to-end data from service call chains so they can better understand latency issues in microservice architectures. Its exclusively meant for distributed tracing and provides a simple web UI that can be used to see traces and spans across services. Trace Analytics plugin and Jaeger enables views of each individual trace in a waterfall-style graph of all the related trace and span executions (similar to jaeger), which makes to easy to identify all the service invocations for each trace, time spent in each service and each span, and the payload content of each span, including errors.
+- **AWS opensearch** (formerly elasticsearch) as the sink for the traces
 
-The Trace Analytics plugin also aggregates trace data into Trace Group views and Service Map views, to enable monitoring insights of application performance on trace data. By going beyond the ability to search and analyze individual traces, these features enable developers to proactively identify application performance issues, not just react to problems when they occur.
+Opensearch is a community-driven, open source search and analytics suite derived from Apache 2.0 licensed Elasticsearch 7.10.2 & Kibana 7.10.2. Additonaly it comes with managed Trace Analytics plugin and a visualization and user interface, OpenSearch Dashboards.
+
+- **Data prepper** and **Jaeger** to re-format opentelemetry trace data and export it to opensearch in formats that both kibana and jaeger understand. (This should go away soon as both jaeger and AWS kibana will natively be able to use otlp traces)
+
+Jaeger with its community engagement and helping track and measure requests and transactions by analyzing end-to-end data from service call chains so they can better understand latency issues in microservice architectures. Its exclusively meant for distributed tracing and provides a simple web UI that can be used to see traces and spans across services. Trace Analytics plugin and Jaeger enables views of each individual trace in a waterfall-style graph of all the related trace and span executions (similar to jaeger), which makes to easy to identify all the service invocations for each trace, time spent in each service and each span, and the payload content of each span, including errors.
 
 Data Prepper is a new component of opensearch that receives trace data from the OpenTelemetry collector, and aggregates, transforms, and normalizes it for analysis and visualization in Kibana
 
-Lastly, Opensearch is a community-driven, open source search and analytics suite derived from Apache 2.0 licensed Elasticsearch 7.10.2 & Kibana 7.10.2. Additonaly it comes with managed Trace Analytics plugin and a visualization and user interface, OpenSearch Dashboards.
+- **Trace Analytics Plugin** for opensearch and Jaeger to vizualize and query traces
+
+The Trace Analytics plugin also aggregates trace data into Trace Group views and Service Map views, to enable monitoring insights of application performance on trace data. By going beyond the ability to search and analyze individual traces, these features enable developers to proactively identify application performance issues, not just react to problems when they occur.
+
 
 #### Architecture
 
-Once we got the components for the pipeline pencilled in, the remaining work to get these components to play nice with each others and scale to our requirement. The pipeline was launched to production and has been processing 4-6 tb of trace data daily. In a nutshell Applications use opentelemetry libraries/API to instrument traces and send it to open telemetry agents. Opentelemetry agents to batch and send traces from microservices to the opnetelemetry gateway collector. The collectors sample the traces and export them to backends which in our case is data prepper and jaeger collector. These backends format and batch push the data to opensearch. Lastly, we have Trace Analytics pluign for Kibana and Jaeger vizualizing this data from opensearch and queried by our internal users
+Once we got the components for the pipeline pencilled in, the remaining work to get these components to play nice with each others and scale to our requirement. The tracing pipeline was launched in production and has been processing 4-6 tb of trace data daily. In a nutshell:
+
+**&#8594;** Applications use opentelemetry libraries/API to instrument traces and send it to open telemetry agents. 
+
+**&#8594;** Opentelemetry agents batch and send traces from microservices to the opnetelemetry gateway collector. 
+
+**&#8594;** The collectors sample the traces and export them to backends which in our case are data prepper and jaeger collector. These backends transform and export the data to opensearch. 
+
+**&#8594;** At the end, we have Trace Analytics pluign for Kibana and Jaeger vizualizing this data from opensearch and queried by our internal users
 
 <img src="img/tracing_step4.png" align="center" >
 
-Let's break down each component ...
+Let's break down each component now ...
 
 #### Breakdown
 
@@ -57,7 +69,7 @@ There are several protocols for context propagation that OpenTelemetry recognize
 - [W3C Correlation-Context HTTP Propagator](https://w3c.github.io/correlation-context/)
 - [B3 Zipkin HTTP Propagator](https://github.com/openzipkin/b3-propagation)
 
-At dow jones, we operate our own istio based service mesh hosted on AWS EKS PaaS. Istio leverages Envoy’s distributed tracing feature to provide tracing integration out of the box. Specifically, Istio provides options to install various tracing backend and configure proxies to send trace spans to them automatically. It requires application to propagate the [B3 Zipkin HTTP Propagator](https://github.com/openzipkin/b3-propagation) headers so that when the proxies send span information, the spans can be correlated correctly into a single trace. This natively works with open telemetry as well since this is a supported context open telemetry context propagation.
+At Dow Jones, we operate our own istio based service mesh hosted on AWS EKS PaaS. Istio leverages Envoy’s distributed tracing feature to provide tracing integration out of the box. Specifically, Istio provides options to install various tracing backend and configure proxies to send trace spans to them automatically. It requires application to propagate the [B3 Zipkin HTTP Propagator](https://github.com/openzipkin/b3-propagation) headers so that when the proxies send span information, the spans can be correlated correctly into a single trace. This natively works with open telemetry as well since this is a supported context open telemetry context propagation.
 
 ##### Data Collection
 
@@ -239,21 +251,24 @@ For every EKS cluster, we deploy collector as a deployment. K8s deployments are 
 
 <img src="img/tracing_step2.png" align="center">
 
-As you notice we have agent-gateway architecture for processing our distributed traces. Besides high availability, it also allows us to use [Tail Sampling Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/processor/tailsamplingprocessor/README.md) more organically with this setup. Tail Sampling Processor enables us to make more intelligent choices when it comes to sampling ing traces. This is especially true for latency measurements, which can only be measured after they’re complete. Since the collector sits at the end of the the pipeline and has a complete picture of a distributed trace, sampling determinations are made in open telemetry collectors which decide to sample based on isolated, independent portions of the trace data.
+Besides high availability, the agent-gateway architecture, also allows us to use [Tail Sampling Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/processor/tailsamplingprocessor/README.md) more organically with this setup. Tail Sampling Processor enables us to make more intelligent choices when it comes to sampling traces. This is especially true for latency measurements, which can only be measured after they’re complete. Since the collector sits at the end of the the pipeline and has a complete picture of a distributed trace, sampling determinations are made in open telemetry collectors which decide to sample based on isolated, independent portions of the trace data.
 
-Today, this processor only works with a single instance of the collector. The workaround is to utilize [Trace ID aware load balancing](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/exporter/loadbalancingexporter/README.md) to support multiple collector instances as a single instance of collector acts a single point of problem. This load balancer exporter is added to the agents . It is responsible for consistently exporting spans and logs belonging to the same trace to the same backend gateway collector so we can do tail based sampling.
+Today, this processor only works with a single instance of the collector. The workaround is to utilize [Trace ID aware load balancing](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/exporter/loadbalancingexporter/README.md) to support multiple collector instances as a single instance of collector acts a single point of problem. This load balancer exporter is added to the agent config. It is responsible for consistently exporting spans and logs belonging to the same trace to the same backend gateway collector so we can do tail based sampling.
 
 ##### Filtering traces for tail based sampling
 
-We will a combination of following filters to sample the traces. The filters for tail sampling are positive selections so if a trace is caught by any of the filter it will be sampled; Alternatively if no filter catches a trace, then it will not be sampled. The filters for tail based sampling can be chained together to get the desired effect:
+We will use a combination of following filters to sample the traces. The filters for tail sampling are positive selections so if a trace is caught by any of the filter it will be sampled; Alternatively if no filter catches a trace, then it will not be sampled. The filters for tail based sampling can be chained together to get the desired effect:
 
-- latency: Sample based on the duration of the trace. The duration is determined by looking at the earliest start time and latest end time, without taking into consideration what happened in between.
-- probabilistic: Sample a percentage of traces.
-- status_code: Sample based upon the status code (OK, ERROR or UNSET)
-- rate_limiting: Sample based on rate of spans per trace per second
-- string_attribute: Sample based on string attributes value matches, both exact and regex value matches are supported
+- **latency**: Sample based on the duration of the trace. The duration is determined by looking at the earliest start time and latest end time, without taking into consideration what happened in between.
+- **probabilistic**: Sample a percentage of traces.
+- **status_code**: Sample based upon the status code (OK, ERROR or UNSET)
+- **rate_limiting**: Sample based on rate of spans per trace per second
+- **string_attribute**: Sample based on string attributes value matches, both exact and regex value matches are supported
 
-While the top 4 are self explanatory, we will be using the string_attribute filter to "sample all" traces but dropping specific service traces that we do not want sampled. Since there is no blocklist for filters, this is a workaround to sample everything but pick and drop services that you might not want sampled. We can do this by : in the agent adding a span attribute for all traces with a key/value pair (e.g - retain_span/false) using attribute processor. We can add another attribute processor now to override that value to false for specific services that we dont want sampled. Once the trace reach the gateway collector, we can now use the string_atrribute filter on tail based sampling with the key: retain_span and value: true. This would then lead to all traces that do not have retain_span: true not being sampled.
+While the top 4 are self explanatory, we will be using the string_attribute filter to create a negative filter. We will be dropping specific service traces that we do not want sampled and sampling all other traces. Since there is no blocklist for filters, this is a workaround to sample all but pick and drop services that you might not want sampled. We can do this by : 
+- **&#8594;** in the agent config, adding a span attribute for all traces with a key/value pair (e.g - retain_span/false) using attribute processor. 
+- **&#8594;** in the agent config, adding another attribute processor now to override that value to false for specific services that we dont want sampled. 
+- **&#8594;** n the gateway config, we can now use the string_atrribute filter on tail based sampling with the **key: retain_span** and **value: true**. This would then lead to all traces that do not have retain_span: true *not* being sampled.
 
 <details>
   <summary>K8s Manifest for OpenTelemetry Collector</summary>
@@ -446,20 +461,9 @@ spec:
 
 ##### Formatting and Exporting Traces
 
-We now have distributed traces created, context propagated and sampled using tail based sampling. We need to format the trace data in a way that our query engine can analyze it. At dow jones we have teams that rely on both Jaeger and Trace Analytics Kibana to query and vizualize this data . With open telemetry we can push the data to multiple backends from the same collector which makes this process pretty simple to achieve. Today, both [Trace Analytics OpenSearch Dashboards plugin](https://opensearch.org/docs/monitoring-plugins/trace/ta-dashboards/) and [Jaeger](https://www.jaegertracing.io/) needs open telemetry data to be transformed to be able to vizualize it. This is why we need a last mile server-side component :
+We now have distributed traces created, context propagated and sampled using tail based sampling. We need to format the trace data in a way that our query engine can analyze it. At Dow Jones we have teams that rely on both Jaeger and Trace Analytics Kibana to query and vizualize this data . With open telemetry we can push the data to multiple backends from the same collector which makes this process pretty simple to achieve. Today, both [Trace Analytics OpenSearch Dashboards plugin](https://opensearch.org/docs/monitoring-plugins/trace/ta-dashboards/) and [Jaeger](https://www.jaegertracing.io/) needs open telemetry data to be transformed to be able to vizualize it. This is why we need a last mile server-side components :
 
-- Jaeger Collector : To transform data for jaeger
-- Data Prepper : To transform this data for Trace Analytics OpenSearch Dashboards plugin
-
-##### Sink : OpenSearch 
-
-As you must have noticed in the architecture, we utilize opensearch to ship to and store traces. [Opensearch](https://aws.amazon.com/blogs/opensource/introducing-opensearch/) is a community-driven, open source fork of Elasticsearch and Kibana. This project includes OpenSearch (derived from Elasticsearch 7.10.2) and OpenSearch Dashboards (derived from Kibana 7.10.2). Additionally, the OpenSearch project is the new home for previous distribution of Elasticsearch (Open Distro for Elasticsearch), which includes features such as enterprise security, alerting, machine learning, SQL, index state management, and more. 
-
-Elasticsearch has long been a primary storage backend for Jaeger. Due to its fast search capabilities and horizontal scalability, Elasticsearch makes an excellent choice for storing and searching trace data, along with other observability data. As AWS open sourced data prepperl which recently went 1.2, we were able to use it to ship the distributed traces to open search. 
-
-<img src="img/tracing_step3.png" align="center" >
-
-- **Jaeger Collector** :
+- **Jaeger Collector** 
 
 [Jaeger is actively working toward the future Jaeger backend components to be based on OpenTelemetry collector](https://www.jaegertracing.io/docs/1.21/opentelemetry/). This integration will make all OpenTelemetry Collector features available in the Jaeger backend components. Till this is experimental, jaeger collector is needed to transform the traces before shipping to opensearch so that jaeger UI is able to consume and vizualize the trace data. Jaeger collector can be deployed as a deployment with a horizontal pod autoscaler attached.
 
@@ -519,7 +523,7 @@ query:
 
 </details>
 
-- **Data Prepper** :
+- **Data Prepper**
 
 Similarly as jaeger, to vizualize disributed traces through Trace Analytics feature in OpenSearch, we need to transform these traces for opensearch (formerly known as AWS managed elasticsearch). Data Prepper is a key component in providing Trace Analytics feature in Opensearch. Data Prepper is a last mile server-side component which collects telemetry data from AWS Distro OpenTelemetry collector or OpenTelemetry collector and transforms it for Elasticsearch. Data Prepper is a data ingestion component of the OpenSearch project that pre-processes documents before storing and indexing in OpenSearch. To pre-process documents, Data Prepper allows you to configure a pipeline that specifies a source, buffers, a series of processors, and sinks. Once you have configured a data pipeline, Data Prepper takes care of managing source, sink, buffer properties, and maintaining state across all instances of Data Prepper on which the pipelines are configured. A single instance of Data Prepper can have one or more pipelines configured. A pipeline definition requires at least a source and sink attribute to be configured, and will use the default buffer and no processor if they are not configured. Data prepper can be deployed as a deployment with a horizontal pod autoscaler attached.
 
@@ -747,11 +751,19 @@ data:
 
 </details>
 
+##### Sink : OpenSearch 
+
+As you must have noticed in the architecture, we utilize opensearch to ship to and store traces. [Opensearch](https://aws.amazon.com/blogs/opensource/introducing-opensearch/) is a community-driven, open source fork of Elasticsearch and Kibana. This project includes OpenSearch (derived from Elasticsearch 7.10.2) and OpenSearch Dashboards (derived from Kibana 7.10.2). Additionally, the OpenSearch project is the new home for previous distribution of Elasticsearch (Open Distro for Elasticsearch), which includes features such as enterprise security, alerting, machine learning, SQL, index state management, and more. 
+
+Elasticsearch has long been a primary storage backend for Jaeger. Due to its fast search capabilities and horizontal scalability, Elasticsearch makes an excellent choice for storing and searching trace data, along with other observability data. As AWS open sourced data prepperl which recently went 1.2, we were able to use it to ship the distributed traces to open search. 
+
+<img src="img/tracing_step3.png" align="center" >
+
 Jaeger collector and data prepper can be configured to ship the distributed traces to the same opensearch. Both deployment create their own index with a mutually exclusive prefix for index name. The opensearch can be configured with index patterns to create two views, one for jaeger traces and the other for otel traces. Trace analytics and Jaeger UI(Query component) are auto configured to reach their own indexes and do not collide with each other. This results in a cheaper setup as it allows for a single open search with multiple data formats instead of spreading them on different opensearches. 
 
 ##### Step 4 : Vizualization
 
-Once you have reach this point, the difficult part is over. You should have distributed traces created, context propagated and sampled using tail based sampling, transformed f and exported to opensearch under different index patterns.
+Once you have reach this point, the difficult part is over. You should have distributed traces created, context propagated and sampled using tail based sampling, transformed and exported to opensearch under different index patterns.
 
 Now is the part where you actually get to use the pipeline and vizualize these traces to run queries, build dashboard, setup alerting. While Trace Analytics OpenSearch Dashboards plugin is a managed kibana plugin that comes with open search, we host our own [Jaeger Frontend/UI](https://www.jaegertracing.io/docs/1.28/frontend-ui/) which provides a simple jaeger UI to query for distributed traces with Traces View
 and Traces Detail View. We deployer Jaeger Query as a deployment within the EKS cluster. Jaeger query can be deployed as a deployment with a horizontal pod autoscaler attached
