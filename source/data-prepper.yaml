@@ -56,9 +56,8 @@ data:
         - elasticsearch:
             hosts: 
               - "https://opensearch-arn.us-east-1.es.amazonaws.com"
-            insecure: true
-            # putting aws_sigv4: false causes auth issues (TBFixed)
-            aws_sigv4: false 
+            insecure: false
+            aws_sigv4: true
             aws_region: "region-name"
             trace_analytics_raw: true
     service-map-pipeline:
@@ -84,9 +83,8 @@ data:
         - elasticsearch:
             hosts: 
               - "https://opensearch-arn.us-east-1.es.amazonaws.com"
-            insecure: true
-            # putting aws_sigv4: false causes auth issues (TBFixed)
-            aws_sigv4: false 
+            insecure: false
+            aws_sigv4: true 
             aws_region: "region-name"
             trace_analytics_service_map: true
   data-prepper-config.yaml: |
