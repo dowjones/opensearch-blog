@@ -42,7 +42,7 @@ Once we got the components for the pipeline penciled, the remaining work to get 
 
 **&#8594;** Trace Analytics plugin for Kibana and Jaeger visualizes trace data from opensearch and allows querying on it.
 
-<img src="../assets/media/blog-images/2021-12-02-distributed-tracing-pipeline-with-opentelemetry/tracing_step4.png" align="center" >
+<img src="img/tracing_step4.png" align="center" >
 
 Let's break it down further by the flow of traces through the distributed tracing pipeline ...
 
@@ -89,7 +89,7 @@ We will be deploying OpenTelemetry agents as daemonset to receive, process, and 
 
 The agent can be deployed either as a daemonset or as a sidecar in a Kubernetes cluster. This step may be skipped (not recommended), if you are creating this pipeline in a test environment and would rather send traces straight to the open telemetry collector, which is running as a deployment (horizontally scalable)
 
-<img src="../assets/media/blog-images/2021-12-02-distributed-tracing-pipeline-with-opentelemetry/tracing_step1.png" align="center">
+<img src="img/tracing_step1.png" align="center">
 
 <details>
   <summary><em><b>Click to expand : K8s Manifest for OpenTelemetry Agent</b></em></summary>
@@ -248,7 +248,7 @@ The OpenTelemetry agent forwards the telemetry data to an OpenTelemetry collecto
 
 K8s deployments are highly elastic and can be automatically scaled up and down via Horizontal Pod Autoscale depending on the amount of traces flowing through the pipeline.
 
-<img src="../assets/media/blog-images/2021-12-02-distributed-tracing-pipeline-with-opentelemetry/tracing_step2.png" align="center">
+<img src="img/tracing_step2.png" align="center">
 
 The agent-gateway architecture also allows us to use [Tail Sampling Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/processor/tailsamplingprocessor/README.md) with more availability in this setup. Tail Sampling Processor enables us to make more intelligent choices when it comes to sampling traces. This is especially true for latency measurements, which can only be measured after they are complete. Since the collector sits at the end of the pipeline and has a complete picture of the distributed trace, sampling determinations are made in opentelemetry collector to sample based on isolated, independent portions of the trace data.
 
@@ -755,7 +755,7 @@ As you must have noticed in the architecture, we utilize OpenSearch to ship to a
 
 OpenSearch makes an excellent choice for storing and searching trace data, along with other observability data due to its fast search capabilities and horizontal scalability.
 
-<img src="../assets/media/blog-images/2021-12-02-distributed-tracing-pipeline-with-opentelemetry/tracing_step3.png" align="center" >
+<img src="img/tracing_step3.png" align="center" >
 
 Jaeger collector and Data Prepper can be configured to ship traces to the same OpenSearch. Both deployments create their indexes with a mutually exclusive prefix for name. OpenSearch can be configured with index patterns to create seperate views:
 - Jaeger : `jaeger-span*`
@@ -770,7 +770,7 @@ Once you reach this point, the difficult part is over. You should have distribut
 Now is the part where you actually get to use the pipeline and visualize these traces to run queries, build dashboards, setup alerting. While Trace Analytics OpenSearch Dashboards plugin is a managed plugin that comes with OpenSearch, we host our own [Jaeger Frontend/UI](https://www.jaegertracing.io/docs/1.28/frontend-ui/) with a simple jaeger UI to query for distributed traces with Traces View
 and Traces Detail View. We deploy Jaeger Query as a deployment within the EKS cluster. Jaeger query can be deployed as a deployment with a horizontal pod autoscaler.
 
-<img src="../assets/media/blog-images/2021-12-02-distributed-tracing-pipeline-with-opentelemetry/tracing_step4.png" align="center" >
+<img src="img/tracing_step4.png" align="center" >
 
 - **Jaeger UI (query)**
 
@@ -860,7 +860,7 @@ esLookback:
 
 Once you have traces flowing through your pipeline, you should see indexes being created in OpenSearch under the otel-v1\* index prefix. As this is created, trace analytics plugin within OpenSearch dashboards should now have visualization for your traces, inclusive of service map, error/throughput graphs, and waterfall trace view for your services.
 
-<img src="../assets/media/blog-images/2021-12-02-distributed-tracing-pipeline-with-opentelemetry/kibana.png" align="center" height="50%"  width="50%">
+<img src="img/kibana.png" align="center" height="50%"  width="50%">
 
 ## Testing
 
